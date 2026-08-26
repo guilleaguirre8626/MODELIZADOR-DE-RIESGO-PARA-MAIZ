@@ -10,7 +10,9 @@ jobs:
         with:
           python-version: '3.12'
       - name: Build observed risk statistics
-        run: python build_data_risk.py
+        - name: Build observed risk statistics
+  working-directory: datarisk
+  run: python build_data_risk.py
       - uses: actions/upload-artifact@v4
         with:
           name: agroclima-data-risk
