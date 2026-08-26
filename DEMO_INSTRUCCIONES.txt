@@ -1,0 +1,9 @@
+Para probar la app completa:
+1) Instalar Node.js 20 o superior.
+2) Abrir esta carpeta en VS Code / terminal.
+3) Ejecutar: npm install
+4) Ejecutar: npm run dev
+5) Abrir la direccion local que informa Vite.
+
+Sin configurar Supabase, la app funciona en MODO DEMO y guarda el historial en el navegador.
+Para usuarios reales, ejecutar supabase.sql y completar .env.
