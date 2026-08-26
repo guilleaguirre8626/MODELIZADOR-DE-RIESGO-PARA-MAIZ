@@ -1,19 +1,37 @@
 name: Build AgroClima Data Risk
+
 on:
   workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas requests numpy
+
       - name: Build observed risk statistics
-        - name: Build observed risk statistics
-  working-directory: datarisk
-  run: python build_data_risk.py
-      - uses: actions/upload-artifact@v4
+        working-directory: datarisk
+        run: python build_data_risk.py
+
+      - name: Upload Data Risk results
+        uses: actions/upload-artifact@v4
         with:
           name: agroclima-data-risk
-          path: generated/
+          path: |
+            datarisk/observed_risk_stats.csv
+            datarisk/observed_risk_stats_upsert.sql
+            datarisk/app_risk_matrix.csv
+            datarisk/risk_events_by_campaign.csv
+            datarisk/daily_weather_pilar_nasa_power.csv
