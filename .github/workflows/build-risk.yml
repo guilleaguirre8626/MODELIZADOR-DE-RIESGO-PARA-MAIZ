@@ -30,8 +30,6 @@ jobs:
         with:
           name: agroclima-data-risk
           path: |
-            datarisk/observed_risk_stats.csv
-            datarisk/observed_risk_stats_upsert.sql
-            datarisk/app_risk_matrix.csv
-            datarisk/risk_events_by_campaign.csv
-            datarisk/daily_weather_pilar_nasa_power.csv
+            datarisk/generated/observed_risk_stats.csv
+            datarisk/generated/observed_risk_stats_upsert.sql
+            datarisk/generated/app_risk_matrix.csv
