@@ -1,0 +1,32 @@
+name: Build AgroClima Data Risk Hydric v3.1
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build hydric historical database
+        working-directory: datarisk
+        run: python build_data_risk.py
+
+      - name: Verify generated files
+        run: |
+          echo "Generated files:"
+          ls -lh datarisk/generated/
+          test -f datarisk/generated/daily_weather_hydric.csv
+
+      - name: Upload Data Risk results
+        uses: actions/upload-artifact@v4
+        with:
+          name: agroclima-data-risk-hydric-v3-1
+          path: datarisk/generated/**
