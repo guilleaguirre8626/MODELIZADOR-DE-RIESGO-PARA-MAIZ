@@ -80,48 +80,65 @@ def window_rows(weather, center, before=15, after=15):
     return out
 
 
-def consec_true(flags, n=3):
-    run=0
-    for x in flags:
-        run = run+1 if x else 0
-        if run>=n: return True
+def consec_true_dated(rows, field, threshold, n=3, mode="ge"):
+    run=0; prev=None
+    for d,r in rows:
+        v=r[field]
+        ok=(v is not None and (v>=threshold if mode=="ge" else v<=threshold))
+        if prev is None or (d-prev).days!=1: run=0
+        run=run+1 if ok else 0
+        if run>=n:return True
+        prev=d
     return False
 
-
 def max_dry_spell(rows, cutoff=1.0):
-    run=best=0
-    for _,r in rows:
-        p=r['precip']
-        dry=(p is not None and p<cutoff)
-        run=run+1 if dry else 0
-        best=max(best,run)
+    run=best=0; prev=None
+    for d,r in rows:
+        if prev is None or (d-prev).days!=1:run=0
+        p=r['precip']; dry=(p is not None and p<cutoff)
+        run=run+1 if dry else 0;best=max(best,run);prev=d
     return best
 
-
-def event_metrics(rows):
+def event_metrics(rows, expected_days=31, scaled_hydric=False):
     tmax=[r['tmax'] for _,r in rows if r['tmax'] is not None]
     tmin=[r['tmin'] for _,r in rows if r['tmin'] is not None]
     precip=[r['precip'] for _,r in rows if r['precip'] is not None]
-    valid_temp=len(tmax)>=26 and len(tmin)>=26
-    valid_p=len(precip)>=26
-    heat_flags=[(r['tmax'] is not None and r['tmax']>=35) for _,r in rows]
-    hotnight_flags=[(r['tmin'] is not None and r['tmin']>=22) for _,r in rows]
+    min_valid=max(1,math.ceil(expected_days*0.84))
+    valid_temp=len(tmax)>=min_valid and len(tmin)>=min_valid
+    valid_p=len(precip)>=min_valid
+    drought_thr=80*expected_days/31 if scaled_hydric else 80
+    excess_thr=180*expected_days/31 if scaled_hydric else 180
     return {
       'heat_any_ge35': (max(tmax)>=35) if valid_temp else None,
-      'heatwave_3d_ge35': consec_true(heat_flags,3) if valid_temp else None,
+      'heatwave_3d_ge35': consec_true_dated(rows,'tmax',35,3,'ge') if valid_temp else None,
       'hot_night_any_ge22': (max(tmin)>=22) if valid_temp else None,
-      'hot_nights_3d_ge22': consec_true(hotnight_flags,3) if valid_temp else None,
+      'hot_nights_3d_ge22': consec_true_dated(rows,'tmin',22,3,'ge') if valid_temp else None,
       'cold_any_le4': (min(tmin)<=4) if valid_temp else None,
       'heavy_rain_any_ge50': (max(precip)>=50) if valid_p else None,
-      'drought_proxy_p31_lt80': (sum(precip)<80) if valid_p else None,
-      'excess_proxy_p31_gt180': (sum(precip)>180) if valid_p else None,
+      'drought_proxy_scaled' if scaled_hydric else 'drought_proxy_p31_lt80': (sum(precip)<drought_thr) if valid_p else None,
+      'excess_proxy_scaled' if scaled_hydric else 'excess_proxy_p31_gt180': (sum(precip)>excess_thr) if valid_p else None,
       'dry_spell_ge10d': (max_dry_spell(rows)>=10) if valid_p else None,
     }
+
+def metric_threshold(metric, expected_days=31):
+    if metric=='drought_proxy_scaled': return round(80*expected_days/31,3)
+    if metric=='excess_proxy_scaled': return round(180*expected_days/31,3)
+    return {'heat_any_ge35':35,'heatwave_3d_ge35':35,'hot_night_any_ge22':22,'hot_nights_3d_ge22':22,'cold_any_le4':4,'heavy_rain_any_ge50':50,'drought_proxy_p31_lt80':80,'excess_proxy_p31_gt180':180,'dry_spell_ge10d':10}[metric]
+
+def phenology_band_rows(weather,center,band):
+    if band=='CORE': return window_rows(weather,center,7,7),15
+    rows=[]
+    for a,b in [(-15,-8),(8,15)]:
+        d=center+timedelta(days=a);end=center+timedelta(days=b)
+        while d<=end:
+            if d in weather:rows.append((d,weather[d]))
+            d+=timedelta(days=1)
+    rows.sort(key=lambda x:x[0]);return rows,16
 
 METRIC_THRESHOLD={
  'heat_any_ge35':35,'heatwave_3d_ge35':35,'hot_night_any_ge22':22,'hot_nights_3d_ge22':22,
  'cold_any_le4':4,'heavy_rain_any_ge50':50,'drought_proxy_p31_lt80':80,'excess_proxy_p31_gt180':180,
- 'dry_spell_ge10d':10
+ 'dry_spell_ge10d':10,'drought_proxy_scaled':0,'excess_proxy_scaled':0
 }
 
 
@@ -161,6 +178,43 @@ def build_stats(weather,campaigns):
         })
     return out,detail
 
+
+def build_phenology_stats(weather,campaigns):
+    accum={}
+    for c in campaigns:
+        sy=c['start_year'];phase=c['phase']
+        for key in FORTNIGHTS:
+            center=center_date(sy,key)
+            for band in ('CORE','SHOULDER'):
+                rows,expected=phenology_band_rows(weather,center,band)
+                metrics=event_metrics(rows,expected_days=expected,scaled_hydric=True)
+                for metric,event in metrics.items():
+                    if metric not in ('heatwave_3d_ge35','cold_any_le4','drought_proxy_scaled','excess_proxy_scaled'):continue
+                    k=(phase,key,band,metric)
+                    accum.setdefault(k,{'events':0,'total':0,'expected':expected})
+                    if event is not None:
+                        accum[k]['total']+=1;accum[k]['events']+=1 if event else 0
+    out=[]
+    for (phase,key,band,metric),a in sorted(accum.items()):
+        prob=a['events']/a['total'] if a['total'] else None
+        out.append({'station_id':STATION_ID,'phase':phase,'fortnight':key,'window_band':band,'metric':metric,'threshold':metric_threshold(metric,a['expected']),'event_campaigns':a['events'],'total_campaigns':a['total'],'probability':round(prob,6) if prob is not None else None,'period_start_year':min(c['start_year'] for c in campaigns),'period_end_year':max(c['start_year'] for c in campaigns),'source':'NASA POWER daily + ENSO; phenology bands CORE R1+/-7 and SHOULDER days 8-15'})
+    return out
+
+def write_phenology_stats(rows):
+    p=OUT/'observed_risk_stats_phenology.csv'
+    cols=['station_id','phase','fortnight','window_band','metric','threshold','event_campaigns','total_campaigns','probability','period_start_year','period_end_year','source']
+    with p.open('w',encoding='utf-8',newline='') as f:
+        w=csv.DictWriter(f,fieldnames=cols);w.writeheader();w.writerows(rows)
+    sql=OUT/'observed_risk_stats_phenology_upsert.sql'
+    with sql.open('w',encoding='utf-8') as f:
+        f.write('-- AgroClima phenology risk statistics\n')
+        f.write('delete from public.observed_risk_stats_phenology where station_id=1;\n\n')
+        for i in range(0,len(rows),200):
+            chunk=rows[i:i+200];f.write('insert into public.observed_risk_stats_phenology ('+','.join(cols)+') values\n')
+            f.write(',\n'.join('('+','.join(sql_literal(r[c]) for c in cols)+')' for r in chunk))
+            f.write('\non conflict (station_id,phase,fortnight,window_band,metric,threshold) do update set event_campaigns=excluded.event_campaigns,total_campaigns=excluded.total_campaigns,probability=excluded.probability,period_start_year=excluded.period_start_year,period_end_year=excluded.period_end_year,source=excluded.source;\n\n')
+        f.write('select phase,fortnight,window_band,metric,probability,event_campaigns,total_campaigns from public.observed_risk_stats_phenology order by phase,fortnight,window_band,metric;\n')
+    return p,sql
 
 def write_stats(rows,detail):
     p=OUT/'observed_risk_stats.csv'
@@ -221,10 +275,10 @@ def main():
     write_daily(weather)
     rows,detail=build_stats(weather,campaigns)
     p,d=write_stats(rows,detail); s=write_sql(rows); a=write_app_view(rows)
-    print('Generated:',p,s,a)
-    # basic validation
-    assert len(rows)>100
-    assert all(r['total_campaigns']>0 for r in rows)
+    prows=build_phenology_stats(weather,campaigns); pp,ps=write_phenology_stats(prows)
+    print('Generated:',p,s,a,pp,ps)
+    assert len(rows)>100 and len(prows)>100
+    assert all(r['total_campaigns']>0 for r in rows) and all(r['total_campaigns']>0 for r in prows)
     print('OK')
 
 if __name__=='__main__': main()
