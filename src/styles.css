@@ -17,3 +17,10 @@
 #phenologyMount{margin-top:10px}
 \n/* v2.8.3 - fenologia compacta */
 .phenology-compact{overflow:hidden}.phen-compact-flow{display:flex;align-items:stretch;gap:8px;overflow-x:auto;padding:8px 2px 12px}.phen-stage-card{flex:0 0 150px;border:1px solid var(--border);border-radius:12px;background:#fff;padding:10px;box-shadow:0 1px 2px rgba(0,0,0,.03)}.phen-stage-critical{border-color:#d9bd52;background:#fffdf3}.phen-stage-r1{border:2px solid #d5a900;background:#fff8dd}.phen-stage-top{display:flex;align-items:center;gap:8px}.phen-stage-top b{font-size:18px;color:var(--green)}.phen-stage-top small{display:block;font-size:10px;color:var(--muted);margin-top:1px}.phen-stage-icon{font-size:25px}.phen-stage-date{font-size:12px;font-weight:800;margin:8px 0;padding-bottom:7px;border-bottom:1px solid var(--border)}.phen-stage-metric{display:flex;align-items:center;justify-content:space-between;gap:5px;font-size:10px;margin-top:6px}.phen-stage-metric .stage-prob{border-radius:7px;padding:4px 6px;min-width:38px}.phen-arrow{flex:0 0 auto;display:flex;align-items:center;font-size:22px;font-weight:800;color:#87938b}@media(max-width:850px){.phen-stage-card{flex-basis:142px}.phen-arrow{font-size:18px}.phenology-compact .section-title{align-items:flex-start}}\n
+/* v2.9.0 - selección múltiple y PDF desde historial */
+.history-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:12px 0 16px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--soft)}
+.history-select-all{display:flex;align-items:center;gap:8px;font-weight:700;cursor:pointer}
+.history-select-all input,[data-select-sim]{width:18px;height:18px;accent-color:var(--green);cursor:pointer}
+.history-bulk-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.select-col{width:34px;text-align:center}
+@media(max-width:700px){.history-toolbar{align-items:stretch}.history-bulk-actions{width:100%;justify-content:space-between}.history-bulk-actions .primary{flex:1}.table .select-col{position:sticky;left:0;background:#fff;z-index:2}}
