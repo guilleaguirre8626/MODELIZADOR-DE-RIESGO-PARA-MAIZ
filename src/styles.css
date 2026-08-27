@@ -46,3 +46,24 @@
 .phen2-legend{display:flex;justify-content:center;gap:28px;flex-wrap:wrap;font-size:12px;margin-top:16px;color:#333}.phen2-foot{text-align:center;margin:11px 0 0;font-size:11px}
 @media(max-width:1050px){.phen2-flow{overflow-x:auto;display:flex;padding-bottom:12px}.phen2-card{flex:0 0 132px}.phen2-flow:before{left:65px;right:65px}.hydric-five{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:650px){.hydric-five{grid-template-columns:repeat(2,minmax(0,1fr))}.phenology-v2-card{padding:14px 10px}.phen2-title{font-size:17px}.phen2-card{flex-basis:124px;min-height:198px}}
+
+
+/* v2.9.3 - Evolucion fenologica a ancho completo */
+.phenology-wide-mount{grid-column:1 / -1;min-width:0;display:none}
+.phenology-wide-mount .phenology-v2-card{margin:0;width:100%;box-sizing:border-box;padding:22px 24px 18px;border:1px solid var(--border)!important;border-left:5px solid var(--green)!important;border-radius:14px;background:#fff}
+.phenology-wide-mount .phen2-title{font-size:22px;font-weight:900;margin:0 0 3px;color:#111}
+.phenology-wide-mount .phen2-subtitle{font-size:14px;margin-bottom:22px}
+.phenology-wide-mount .phen2-flow{position:relative;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:16px;overflow:visible;padding:0}
+.phenology-wide-mount .phen2-flow:before{content:"";display:block;position:absolute;left:7%;right:7%;top:111px;height:3px;background:#84b58f;z-index:0}
+.phenology-wide-mount .phen2-card{position:relative;z-index:1;min-width:0;min-height:225px;border:1.5px solid #6eb17f;border-radius:12px;background:#fbfefc;padding:15px 12px 13px;text-align:center;display:flex;flex-direction:column;box-sizing:border-box}
+.phenology-wide-mount .phen2-card:after{content:"";position:absolute;top:107px;left:50%;width:12px;height:12px;border-radius:50%;background:#2f914e;transform:translate(-50%,-50%);box-shadow:0 0 0 4px #fff}
+.phenology-wide-mount .phen2-warn{border-color:#e9ac18;background:#fffdf5}.phenology-wide-mount .phen2-warn:after{background:#e9a900}
+.phenology-wide-mount .phen2-r1{border:2px solid #ef4d3b;background:#fffafa}.phenology-wide-mount .phen2-r1:after{background:#ef4d3b}
+.phenology-wide-mount .phen2-code{font-size:25px;line-height:1;font-weight:900}
+.phenology-wide-mount .phen2-date{font-size:12px;margin-top:8px;min-height:20px}
+.phenology-wide-mount .phen2-critical{font-size:9px;margin:7px auto 0}
+.phenology-wide-mount .phen2-line{height:33px;margin-top:4px}
+.phenology-wide-mount .phen2-metric{font-size:12px;margin-top:13px}.phenology-wide-mount .phen2-metric b{font-size:14px}
+.phenology-wide-mount .phen2-legend{font-size:13px;gap:32px;margin-top:20px}.phenology-wide-mount .phen2-foot{font-size:12px;margin-top:12px}
+@media(max-width:1050px){.phenology-wide-mount .phen2-flow{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.phenology-wide-mount .phen2-flow:before{display:none}.phenology-wide-mount .phen2-card{min-height:205px}.phenology-wide-mount .phen2-card:after{display:none}}
+@media(max-width:620px){.phenology-wide-mount .phenology-v2-card{padding:17px 12px 14px}.phenology-wide-mount .phen2-title{font-size:19px}.phenology-wide-mount .phen2-flow{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.phenology-wide-mount .phen2-card{min-height:190px;padding:12px 9px}.phenology-wide-mount .phen2-code{font-size:22px}.phenology-wide-mount .phen2-metric{font-size:11px}.phenology-wide-mount .phen2-metric b{font-size:12px}}

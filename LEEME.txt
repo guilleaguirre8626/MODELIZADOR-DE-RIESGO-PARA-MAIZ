@@ -1,0 +1,19 @@
+MODELIZADOR DE RIESGO PARA MAIZ v2.9.4 - LIMPIO
+
+Cambios pedidos:
+- Eliminado el recuadro "Score combinado final".
+- Estado hidrico a R1 conserva SOLO:
+  1) Riesgo de estres en R1
+  2) >=3 dias con estres
+  3) Lluvia mediana siembra->R1
+  4) ETc potencial mediana
+  5) Campanas comparables
+- Eliminada cualquier referencia a "Evolucion fenologica simplificada".
+- Se mantiene unicamente "EVOLUCION FENOLOGICA - Etapas clave y riesgo esperado".
+- Eliminado el grafico "Comparacion de fechas alternativas".
+- Se mantiene historial con seleccion multiple, PDF y eliminacion.
+
+Subir/reemplazar en GitHub:
+- index.html
+- src/main.js
+- src/styles.css
