@@ -15,7 +15,7 @@ const DEFAULT_MODEL={version:'v0.1-priors',heat_weight:.4,cold_weight:.15,drough
 const TEMP_MEAN={9:16.5,10:19.5,11:22,12:24.2,1:25,2:24,3:21.5,4:17.5};
 const FALLBACK_PRIORS={'09-2':{heat:5,cold:8,drought:30,excess:15},'10-1':{heat:8,cold:4,drought:25,excess:20},'10-2':{heat:12,cold:2,drought:20,excess:22},'11-1':{heat:18,cold:1,drought:18,excess:25},'11-2':{heat:25,cold:1,drought:15,excess:28},'12-1':{heat:35,cold:.5,drought:15,excess:30},'12-2':{heat:45,cold:.5,drought:12,excess:32},'01-1':{heat:55,cold:.5,drought:12,excess:35},'01-2':{heat:60,cold:.5,drought:10,excess:35},'02-1':{heat:50,cold:2,drought:10,excess:30},'02-2':{heat:40,cold:3,drought:12,excess:25},'03-1':{heat:20,cold:8,drought:15,excess:20},'03-2':{heat:10,cold:15,drought:18,excess:18}};
 const ENSO_FACTORS={Nino:{heat:1,cold:1,drought:1,excess:1},Neutral:{heat:1.04,cold:1,drought:1.15,excess:.88},Nina:{heat:1.10,cold:1,drought:1.35,excess:.72}};
-let state={user:null,hybrids:[],farms:[],fields:[],stations:[],priors:{},observed:[],phenObserved:[],hydricReady:false,phenProfiles:{CORE:{heat_weight:.50,drought_weight:.30,excess_weight:.15,cold_weight:.05,band_weight:.60},SHOULDER:{heat_weight:.40,drought_weight:.30,excess_weight:.20,cold_weight:.10,band_weight:.40}},model:{...DEFAULT_MODEL},history:[],tab:'dashboard',last:null,charts:[]};
+let state={user:null,profile:null,users:[],hybrids:[],farms:[],fields:[],stations:[],priors:{},observed:[],phenObserved:[],hydricReady:false,phenProfiles:{CORE:{heat_weight:.50,drought_weight:.30,excess_weight:.15,cold_weight:.05,band_weight:.60},SHOULDER:{heat_weight:.40,drought_weight:.30,excess_weight:.20,cold_weight:.10,band_weight:.40}},model:{...DEFAULT_MODEL},history:[],tab:'dashboard',last:null,charts:[],recoveryMode:false};
 
 const $=s=>document.querySelector(s); const app=()=>$('#app');
 function esc(v=''){return String(v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
@@ -35,7 +35,26 @@ function requestLocation(onSuccess,statusEl){if(!navigator.geolocation){if(statu
 function riskClass(s){if(s<=20)return['Muy bajo','low'];if(s<=35)return['Bajo','low'];if(s<=50)return['Moderado','medium'];if(s<=70)return['Alto','high'];return['Muy alto','veryhigh']}
 function clearCharts(){state.charts.forEach(c=>{try{c.destroy()}catch{}});state.charts=[]}
 
-async function bootstrap(){const {data}=await sb.auth.getSession();state.user=data.session?.user||null;if(!state.user)return loginView();await loadReference();await loadUserData();render();}
+async function bootstrap(){
+  const {data}=await sb.auth.getSession();
+  state.user=data.session?.user||null;
+  if(!state.user)return loginView();
+  const access=await loadProfileAndCheckAccess();
+  if(!access)return;
+  await loadReference();
+  await loadUserData();
+  if(state.profile?.role==='admin')await loadUsers();
+  render();
+}
+async function loadProfileAndCheckAccess(){
+  const {data,error}=await sb.from('profiles').select('*').eq('id',state.user.id).maybeSingle();
+  if(error){console.warn('Perfil:',error.message);return accessErrorView('No se pudo verificar la autorización de la cuenta. '+error.message),false;}
+  if(!data){return accessErrorView('La cuenta existe en Auth pero no tiene perfil de acceso. Ejecutá el parche de usuarios en Supabase.'),false;}
+  state.profile=data;
+  if(data.blocked){await sb.auth.signOut();state.user=null;blockedView();return false;}
+  if(!data.approved){pendingView();return false;}
+  return true;
+}
 async function loadReference(){
   const [h,m,p,o,po,pp,st]=await Promise.all([
     sb.from('hybrids').select('*').eq('active',true).order('name'),
@@ -49,8 +68,7 @@ async function loadReference(){
   if(h.data?.length)state.hybrids=h.data;
   if(m.data?.length)state.model={...DEFAULT_MODEL,...m.data[0]};
   if(p.data?.length){state.priors={};p.data.forEach(x=>state.priors[x.fortnight]={heat:Number(x.p_heat)*100,cold:Number(x.p_cold)*100,drought:Number(x.p_drought)*100,excess:Number(x.p_excess)*100});}else state.priors={...FALLBACK_PRIORS};
-  state.observed=o.data||[];
-  state.phenObserved=po.data||[];
+  state.observed=o.data||[];state.phenObserved=po.data||[];
   if(pp.data?.length){state.phenProfiles={};pp.data.forEach(x=>state.phenProfiles[x.band]={heat_weight:Number(x.heat_weight),drought_weight:Number(x.drought_weight),excess_weight:Number(x.excess_weight),cold_weight:Number(x.cold_weight),band_weight:Number(x.band_weight)});}
   state.stations=st.data||[];
   try{const {count}=await sb.from('daily_weather').select('*',{count:'exact',head:true}).not('eto_mm','is',null);state.hydricReady=Number(count||0)>1000;}catch{state.hydricReady=false;}
@@ -63,16 +81,56 @@ async function loadUserData(){
   ]);
   state.farms=fa.data||[];state.fields=fi.data||[];state.history=hi.data||[];
 }
-
-function loginView(){app().innerHTML=`<div class="login"><div class="card"><div class="brand"><h1>Modelizador de Riesgo para Maíz</h1><p>Riesgo agroclimático y decisiones de siembra.</p></div><form id="loginForm"><label class="label">Email</label><input id="email" type="email" required><label class="label">Contraseña</label><input id="password" type="password" minlength="6" required><div class="actions"><button class="primary">Ingresar</button><button id="signup" class="secondary" type="button">Crear usuario</button></div></form><div class="note">La app guarda tus campos, lotes y simulaciones en Supabase. Cada usuario accede sólo a sus propios datos.</div></div></div>`;
-  $('#loginForm').addEventListener('submit',async e=>{e.preventDefault();const {data,error}=await sb.auth.signInWithPassword({email:$('#email').value,password:$('#password').value});if(error)return alert(error.message);state.user=data.user;await bootstrap();});
-  $('#signup').addEventListener('click',async()=>{const {error}=await sb.auth.signUp({email:$('#email').value,password:$('#password').value});alert(error?error.message:'Usuario creado. Si la confirmación de email está activa, revisá tu correo.');});
+async function loadUsers(){
+  if(state.profile?.role!=='admin'){state.users=[];return;}
+  const {data,error}=await sb.from('profiles').select('*').order('requested_at',{ascending:false});
+  if(error){console.warn('Usuarios:',error.message);state.users=[];return;}
+  state.users=data||[];
 }
+function authCard(inner){return `<div class="login"><div class="card"><div class="brand"><h1>Modelizador de Riesgo para Maíz</h1><p>Riesgo agroclimático y decisiones de siembra.</p></div>${inner}</div></div>`}
+function loginView(message=''){
+  app().innerHTML=authCard(`${message?`<div class="note">${esc(message)}</div>`:''}<form id="loginForm"><label class="label">Email</label><input id="email" type="email" autocomplete="email" required><label class="label">Contraseña</label><input id="password" type="password" autocomplete="current-password" minlength="6" required><div class="actions"><button class="primary">Ingresar</button><button id="signup" class="secondary" type="button">Crear cuenta</button></div><button id="forgot" class="link-button" type="button">¿Olvidaste tu contraseña?</button></form><div class="note"><b>Acceso administrado.</b><br>Las cuentas nuevas quedan pendientes hasta ser autorizadas por el administrador.</div>`);
+  $('#loginForm').addEventListener('submit',async e=>{e.preventDefault();const {data,error}=await sb.auth.signInWithPassword({email:$('#email').value.trim(),password:$('#password').value});if(error)return alert(error.message);state.user=data.user;await bootstrap();});
+  $('#signup').addEventListener('click',registerView);
+  $('#forgot').addEventListener('click',forgotPasswordView);
+}
+function registerView(){
+  app().innerHTML=authCard(`<button id="backLogin" class="ghost" type="button">← Volver</button><h2>Crear cuenta</h2><p class="muted">Después de validar el email, la cuenta quedará pendiente de aprobación.</p><form id="registerForm"><label class="label">Nombre y apellido</label><input id="regName" required autocomplete="name"><label class="label">Email</label><input id="regEmail" type="email" required autocomplete="email"><label class="label">Contraseña</label><input id="regPassword" type="password" minlength="6" required autocomplete="new-password"><label class="label">Repetir contraseña</label><input id="regPassword2" type="password" minlength="6" required autocomplete="new-password"><button class="primary" style="margin-top:14px">Solicitar cuenta</button></form><div id="regMsg"></div>`);
+  $('#backLogin').addEventListener('click',()=>loginView());
+  $('#registerForm').addEventListener('submit',async e=>{e.preventDefault();const p=$('#regPassword').value;if(p!==$('#regPassword2').value)return alert('Las contraseñas no coinciden.');const redirectTo=location.origin+location.pathname;const {data,error}=await sb.auth.signUp({email:$('#regEmail').value.trim(),password:p,options:{emailRedirectTo:redirectTo,data:{full_name:$('#regName').value.trim()}}});if(error)return alert(error.message);$('#regMsg').innerHTML='<div class="note"><b>Solicitud creada.</b><br>Revisá tu correo si Supabase solicita confirmar el email. Luego la cuenta quedará pendiente de aprobación del administrador.</div>';if(data.session){state.user=data.user;setTimeout(()=>bootstrap(),800);}});
+}
+function forgotPasswordView(){
+  app().innerHTML=authCard(`<button id="backLogin" class="ghost" type="button">← Volver</button><h2>Recuperar contraseña</h2><p class="muted">Te enviaremos un enlace para definir una nueva contraseña.</p><form id="forgotForm"><label class="label">Email</label><input id="forgotEmail" type="email" required autocomplete="email"><button class="primary" style="margin-top:14px">Enviar email de recuperación</button></form><div id="forgotMsg"></div>`);
+  $('#backLogin').addEventListener('click',()=>loginView());
+  $('#forgotForm').addEventListener('submit',async e=>{e.preventDefault();const redirectTo=location.origin+location.pathname+'?recovery=1';const {error}=await sb.auth.resetPasswordForEmail($('#forgotEmail').value.trim(),{redirectTo});if(error)return alert(error.message);$('#forgotMsg').innerHTML='<div class="note"><b>Email enviado.</b><br>Revisá tu bandeja de entrada y spam. Abrí el enlace de recuperación desde el mismo navegador.</div>';});
+}
+function resetPasswordView(){
+  state.recoveryMode=true;
+  app().innerHTML=authCard(`<h2>Nueva contraseña</h2><p class="muted">Ingresá una contraseña nueva para tu cuenta.</p><form id="resetForm"><label class="label">Nueva contraseña</label><input id="newPass" type="password" minlength="6" required autocomplete="new-password"><label class="label">Repetir contraseña</label><input id="newPass2" type="password" minlength="6" required autocomplete="new-password"><button class="primary" style="margin-top:14px">Guardar contraseña</button></form>`);
+  $('#resetForm').addEventListener('submit',async e=>{e.preventDefault();if($('#newPass').value!==$('#newPass2').value)return alert('Las contraseñas no coinciden.');const {error}=await sb.auth.updateUser({password:$('#newPass').value});if(error)return alert(error.message);state.recoveryMode=false;history.replaceState({},'',location.pathname);await sb.auth.signOut();loginView('Contraseña actualizada. Ya podés ingresar.');});
+}
+function pendingView(){
+  app().innerHTML=authCard(`<div class="note warning"><b>Cuenta pendiente de aprobación</b><br>Tu email ya está registrado, pero el administrador todavía debe habilitar el acceso.</div><p class="muted">Cuenta: ${esc(state.user?.email||state.profile?.email||'')}</p><div class="actions"><button id="pendingRefresh" class="primary" type="button">Verificar aprobación</button><button id="pendingLogout" class="ghost" type="button">Salir</button></div>`);
+  $('#pendingRefresh').addEventListener('click',()=>bootstrap());$('#pendingLogout').addEventListener('click',async()=>{await sb.auth.signOut();state.user=null;state.profile=null;loginView();});
+}
+function blockedView(){app().innerHTML=authCard(`<div class="note warning"><b>Cuenta bloqueada</b><br>El acceso fue deshabilitado por el administrador.</div><button id="backLogin" class="primary" type="button">Volver</button>`);$('#backLogin').addEventListener('click',()=>loginView());}
+function accessErrorView(msg){app().innerHTML=authCard(`<div class="note warning"><b>No se pudo validar el acceso</b><br>${esc(msg)}</div><div class="actions"><button id="retryAccess" class="primary" type="button">Reintentar</button><button id="logoutAccess" class="ghost" type="button">Salir</button></div>`);$('#retryAccess').addEventListener('click',()=>bootstrap());$('#logoutAccess').addEventListener('click',async()=>{await sb.auth.signOut();loginView();});}
 
-function shell(content){return `<div class="app"><div class="header"><div class="brand"><h1>Modelizador de Riesgo para Maíz</h1><p>Centro-norte de Córdoba · herramienta de decisión agronómica</p></div><div class="userbar"><span class="muted">${esc(state.user?.email||'')}</span><button id="logout" class="ghost">Salir</button></div></div><div class="tabs">${[['dashboard','Resumen'],['simulate','Nueva simulación'],['history','Historial'],['hybrids','Híbridos'],['fields','Campos y lotes']].map(([k,n])=>`<button class="tab ${state.tab===k?'active':''}" data-tab="${k}">${n}</button>`).join('')}</div>${content}</div>`}
-function render(){clearCharts();let content=state.tab==='simulate'?simulateView():state.tab==='history'?historyView():state.tab==='hybrids'?hybridsView():state.tab==='fields'?fieldsView():dashboardView();app().innerHTML=shell(content);bindCommon();bindTab();}
-function bindCommon(){$('#logout').addEventListener('click',async()=>{await sb.auth.signOut();state.user=null;loginView();});}
-function bindTab(){document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>{state.tab=b.dataset.tab;render();}));if(state.tab==='simulate')bindSimulation();if(state.tab==='fields')bindFields();if(state.tab==='hybrids')bindHybridCards();if(state.tab==='history')bindHistory();}
+function shell(content){const tabs=[['dashboard','Resumen'],['simulate','Nueva simulación'],['history','Historial'],['hybrids','Híbridos'],['fields','Campos y lotes']];if(state.profile?.role==='admin')tabs.push(['users','Usuarios']);return `<div class="app"><div class="header"><div class="brand"><h1>Modelizador de Riesgo para Maíz</h1><p>Centro-norte de Córdoba · herramienta de decisión agronómica</p></div><div class="userbar"><span class="muted">${esc(state.profile?.full_name||state.user?.email||'')}${state.profile?.role==='admin'?' · Administrador':''}</span><button id="logout" class="ghost">Salir</button></div></div><div class="tabs">${tabs.map(([k,n])=>`<button class="tab ${state.tab===k?'active':''}" data-tab="${k}">${n}${k==='users'&&state.users.filter(u=>!u.approved&&!u.blocked).length?` <span class="badge medium">${state.users.filter(u=>!u.approved&&!u.blocked).length}</span>`:''}</button>`).join('')}</div>${content}</div>`}
+function render(){clearCharts();let content=state.tab==='simulate'?simulateView():state.tab==='history'?historyView():state.tab==='hybrids'?hybridsView():state.tab==='fields'?fieldsView():state.tab==='users'&&state.profile?.role==='admin'?usersView():dashboardView();app().innerHTML=shell(content);bindCommon();bindTab();}
+function bindCommon(){$('#logout').addEventListener('click',async()=>{await sb.auth.signOut();state.user=null;state.profile=null;state.users=[];loginView();});}
+function bindTab(){document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>{state.tab=b.dataset.tab;render();}));if(state.tab==='simulate')bindSimulation();if(state.tab==='fields')bindFields();if(state.tab==='hybrids')bindHybridCards();if(state.tab==='history')bindHistory();if(state.tab==='users'&&state.profile?.role==='admin')bindUsers();}
+function usersView(){
+  const pending=state.users.filter(u=>!u.approved&&!u.blocked),approved=state.users.filter(u=>u.approved&&!u.blocked),blocked=state.users.filter(u=>u.blocked);
+  const row=u=>`<tr><td><b>${esc(u.full_name||'Sin nombre')}</b><br><span class="muted">${esc(u.email||'')}</span></td><td>${new Date(u.requested_at||Date.now()).toLocaleString('es-AR')}</td><td>${esc(u.role||'productor')}</td><td>${u.blocked?'<span class="badge high">Bloqueada</span>':u.approved?'<span class="badge low">Aprobada</span>':'<span class="badge medium">Pendiente</span>'}</td><td><div class="actions">${!u.approved&&!u.blocked?`<button class="primary" data-approve-user="${u.id}">Aprobar</button>`:''}${u.approved&&!u.blocked&&u.id!==state.user.id?`<button class="secondary" data-block-user="${u.id}">Bloquear</button>`:''}${u.blocked?`<button class="secondary" data-unblock-user="${u.id}">Desbloquear</button>`:''}</div></td></tr>`;
+  const table=arr=>arr.length?`<div class="table-wrap"><table class="table"><thead><tr><th>Usuario</th><th>Solicitud</th><th>Rol</th><th>Estado</th><th>Acción</th></tr></thead><tbody>${arr.map(row).join('')}</tbody></table></div>`:'<div class="empty">No hay usuarios en esta categoría.</div>';
+  return `<div class="grid"><div class="card span12"><div class="section-title"><h2>Administración de usuarios</h2><span class="muted">${state.users.length} cuentas</span></div><div class="note"><b>Flujo:</b> registro → confirmación de email (si está activa) → pendiente → aprobación del administrador → acceso.</div></div><div class="card span12"><h3>Pendientes (${pending.length})</h3>${table(pending)}</div><div class="card span12"><h3>Aprobados (${approved.length})</h3>${table(approved)}</div><div class="card span12"><h3>Bloqueados (${blocked.length})</h3>${table(blocked)}</div></div>`;
+}
+function bindUsers(){
+  document.querySelectorAll('[data-approve-user]').forEach(b=>b.addEventListener('click',async()=>{const {error}=await sb.from('profiles').update({approved:true,approved_at:new Date().toISOString(),blocked:false}).eq('id',b.dataset.approveUser);if(error)return alert(error.message);await loadUsers();render();}));
+  document.querySelectorAll('[data-block-user]').forEach(b=>b.addEventListener('click',async()=>{if(!confirm('¿Bloquear esta cuenta?'))return;const {error}=await sb.from('profiles').update({blocked:true,approved:false}).eq('id',b.dataset.blockUser);if(error)return alert(error.message);await loadUsers();render();}));
+  document.querySelectorAll('[data-unblock-user]').forEach(b=>b.addEventListener('click',async()=>{const {error}=await sb.from('profiles').update({blocked:false,approved:true,approved_at:new Date().toISOString()}).eq('id',b.dataset.unblockUser);if(error)return alert(error.message);await loadUsers();render();}));
+}
 
 function dashboardView(){
   const last=state.history[0];const obs=state.observed.length>0;const farms=state.farms.length;const fields=state.fields.length;
@@ -285,4 +343,10 @@ function bindFields(){
   document.querySelectorAll('[data-delete-farm]').forEach(b=>b.addEventListener('click',async()=>{if(!confirm('Eliminar el campo también elimina sus lotes. ¿Continuar?'))return;const {error}=await sb.from('farms').delete().eq('id',b.dataset.deleteFarm);if(error)return alert(error.message);await loadUserData();render();}));
 }
 
-bootstrap();
+sb.auth.onAuthStateChange((event,session)=>{
+  if(event==='PASSWORD_RECOVERY')setTimeout(()=>resetPasswordView(),0);
+});
+if(new URLSearchParams(location.search).get('recovery')==='1'){
+  // Supabase completará la sesión de recuperación y disparará PASSWORD_RECOVERY.
+  setTimeout(()=>{if(!state.recoveryMode)resetPasswordView()},1200);
+}else bootstrap();

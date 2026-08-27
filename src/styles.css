@@ -4,3 +4,4 @@
 
 /* v2.2 histórico */
 .risk-details{display:grid;gap:10px;margin:14px 0}.risk-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 14px;padding:10px 0;border-bottom:1px solid var(--border)}.risk-row span{font-weight:600}.risk-row b{font-size:1.05rem}.risk-row small{grid-column:1/-1;color:var(--muted)}
+.link-button{background:none;border:0;color:var(--accent);padding:10px 0;cursor:pointer;text-decoration:underline;font:inherit}.link-button:hover{opacity:.8}
