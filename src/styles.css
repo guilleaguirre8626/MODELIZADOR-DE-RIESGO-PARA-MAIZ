@@ -24,3 +24,25 @@
 .history-bulk-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .select-col{width:34px;text-align:center}
 @media(max-width:700px){.history-toolbar{align-items:stretch}.history-bulk-actions{width:100%;justify-content:space-between}.history-bulk-actions .primary{flex:1}.table .select-col{position:sticky;left:0;background:#fff;z-index:2}}
+
+
+/* v2.9.2 - visualizacion fenologica final */
+.hydric-five{grid-template-columns:repeat(5,minmax(0,1fr))}
+.phenology-v2-card{margin-top:16px;padding:18px 16px 14px;background:#fff;border:1px solid var(--border)!important;border-left:4px solid var(--green)!important;box-shadow:none!important}
+.phen2-title{font-size:20px;font-weight:900;letter-spacing:.01em;color:#111;margin-bottom:2px}
+.phen2-subtitle{font-size:13px;color:var(--muted);margin-bottom:18px}
+.phen2-flow{position:relative;display:grid;grid-template-columns:repeat(6,minmax(105px,1fr));gap:14px;align-items:stretch;padding:0 2px}
+.phen2-flow:before{content:"";position:absolute;left:5.5%;right:5.5%;top:104px;height:2px;background:#7fb38e;z-index:0}
+.phen2-card{position:relative;z-index:1;min-height:205px;border:1.5px solid #7db88c;border-radius:11px;background:#fbfefc;padding:12px 10px 10px;text-align:center;display:flex;flex-direction:column;align-items:stretch}
+.phen2-card:after{content:"";position:absolute;top:100px;left:50%;width:11px;height:11px;border-radius:50%;background:#2f914e;transform:translate(-50%,-50%);box-shadow:0 0 0 3px #fff}
+.phen2-warn{border-color:#e9ac18;background:#fffdf5}.phen2-warn:after{background:#e9a900}
+.phen2-r1{border:2px solid #ef4d3b;background:#fffafa}.phen2-r1:after{background:#ef4d3b}
+.phen2-code{font-size:22px;font-weight:900;color:#2f914e;line-height:1.1}
+.phen2-warn .phen2-code{color:#e3a000}.phen2-r1 .phen2-code{color:#e53122}
+.phen2-date{font-size:11px;font-weight:800;color:#222;margin-top:7px;min-height:18px}
+.phen2-critical{font-size:9px;font-weight:900;color:#e53122;border:1px solid #ef4d3b;border-radius:5px;padding:3px 4px;margin:5px auto 0;background:#fff;white-space:nowrap}
+.phen2-line{height:30px;display:flex;align-items:center;justify-content:center;margin-top:4px}.phen2-line span{display:block;width:18px;height:2px;background:#c8ddd0}
+.phen2-metric{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11px;margin-top:12px;text-align:left}.phen2-metric b{font-size:12px}.phen2-metric:first-of-type b{color:#e04b27}.phen2-metric:last-of-type b{color:#1677d2}
+.phen2-legend{display:flex;justify-content:center;gap:28px;flex-wrap:wrap;font-size:12px;margin-top:16px;color:#333}.phen2-foot{text-align:center;margin:11px 0 0;font-size:11px}
+@media(max-width:1050px){.phen2-flow{overflow-x:auto;display:flex;padding-bottom:12px}.phen2-card{flex:0 0 132px}.phen2-flow:before{left:65px;right:65px}.hydric-five{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:650px){.hydric-five{grid-template-columns:repeat(2,minmax(0,1fr))}.phenology-v2-card{padding:14px 10px}.phen2-title{font-size:17px}.phen2-card{flex-basis:124px;min-height:198px}}
